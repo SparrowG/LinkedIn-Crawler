@@ -21,8 +21,8 @@ class LinkedinPageGatherer:
   to obtain additional information (these limited initial search strings usually lack
   vital info like names)
   """
-  def __init__(self, companyName, login, password, maxsearch=100,
-               totalresultpercent=.7, maxskunk=100):
+  def __init__(self, login, password, maxsearch=100,
+               totalresultpercent=.7, maxskunk=100,**kwargs):
     """
     login and password are params for a valid linkedin account
     maxsearch is the number of results - linkedin limit unpaid accounts to 100
@@ -30,12 +30,13 @@ class LinkedinPageGatherer:
     maxskunk is the number of searches this class will attempt before giving up
     """
     #list of person_searchobj
+    query=''
+    for k,v in kwargs.items():
+        query+="&"+k+"="+v
     self.people_searchobj = []
-    self.companyName = companyName
     self.login = login
     self.password = password
-    self.fullurl = ("http://www.linkedin.com/search?search=&company="+companyName+
-                    "&currentCompany=currentCompany", "&page_num=", "0")
+    self.fullurl = ("http://www.linkedin.com/search?search="+query, "&page_num=", "1")
     self.opener = self.linkedin_login()
     #for the smart_people_adder
     self.searchSpecific = []
@@ -52,6 +53,8 @@ class LinkedinPageGatherer:
     skunked = 0
     currurl = self.fullurl[0] + self.fullurl[1]
     extraparamindex = 0
+    
+
  
     while currrespercent < self.totalresultpercent and skunked <= maxskunk:
       numresults = self.get_num_results(currurl)
@@ -63,8 +66,11 @@ class LinkedinPageGatherer:
       print "skunked", skunked
       print "numresults", numresults
       print "save_num", save_num
- 
-      for i in range (0, int(min(math.ceil(self.maxsearch/10), math.ceil(numresults/10)))):
+     
+      if self.total_results == 0:
+        print "No matches found" 
+        return
+      for i in range (1, int(min(math.ceil(self.maxsearch/10), math.ceil(numresults/10)))+1):
         #function adds to self.people_searchobj
         print "currurl" + currurl + str(i)
         self.return_people_links(currurl + str(i))
@@ -109,6 +115,8 @@ class LinkedinPageGatherer:
  
   def parse_page(self, page):
     thesePeople = LinkedinHTMLParser()
+    page=page.replace('<![if (!IE)|(lt IE 9)]>', '')
+    page=page.replace('<![endif]>', '')
     thesePeople.feed(page)
     for newperson in thesePeople.personArray:
       unique = True
@@ -132,8 +140,8 @@ class LinkedinPageGatherer:
   #return the number of results, very breakable
   def get_num_results(self, url=None):
     #by default return total in company
-    if url == None:
-      fd = self.opener.open(self.fullurl[0] + "1")
+    if url is None:
+      fd = self.opener.open(self.fullurl[0] )
     else:
       fd = self.opener.open(url)
     data = fd.read()
@@ -143,7 +151,8 @@ class LinkedinPageGatherer:
     searchstr = "<p class=\"summary keywords\">"
     sindex = data.find(searchstr) + len(searchstr)
     eindex = data.find("</strong>", sindex)
-    return(int(data[sindex:eindex].strip().strip("<strong>").replace(",", "").strip()))
+    val=int((data[sindex:eindex].strip().strip("<strong>").replace(",", "").strip()))
+    return(val)
  
   #returns an opener object that contains valid cookies
   def linkedin_login(self):
@@ -188,8 +197,8 @@ class LinkedinTotalPageGather(LinkedinPageGatherer):
   """
   Overhead class that generates the person_searchobjs, using GoogleQueery
   """
-  def __init__(self, companyName, login, password):
-    LinkedinPageGatherer.__init__(self, companyName, login, password)
+  def __init__(self, login, password, **kwargs):
+    LinkedinPageGatherer.__init__(self, login, password, **kwargs)
     extraPeople = []
     for person in self.people_searchobj:
       mgoogqueery = GoogleQueery(person.goog_printstring())
@@ -216,4 +225,7 @@ class LinkedinTotalPageGather(LinkedinPageGatherer):
  
 if __name__ == "__main__":
   #args are email and password for linkedin
-  my = LinkedinTotalPageGather('artoo', sys.argv[1], sys.argv[2])
+  if len(sys.argv) == 3:
+    pass
+  my = LinkedinTotalPageGather(sys.argv[1], sys.argv[2], company='artoo')
+  my
